@@ -2,4 +2,4 @@
 
 __version__ = '0.0.1'
 __author__ = 'Christian Merrill'
-__licesne__ = 'MIT'
+__license__ = 'MIT'
