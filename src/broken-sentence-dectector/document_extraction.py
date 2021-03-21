@@ -2,6 +2,7 @@ import glob
 import json
 import argparse
 import os
+import uuid
 import multiprocessing
 import spacy
 import scispacy
@@ -28,12 +29,19 @@ class NotEnoughCPUsException(Exception):
         super().__init__(self.message)
 
 
+class TooFewCPUsException(Exception):
+    """Custom exception if a user tries to use too few CPUs"""
+    def __init__(self, message="Invalid CPU Number.  Please try to use more than 0 CPUs."):
+        self.message = message
+        super().__init__(self.message)
+
+
 # Parser Object
 parser = argparse.ArgumentParser(description="Arguments for processing data")
 parser.add_argument("--path", type=str, default='data/document_parses/pmc_json')
 parser.add_argument("--ext", type=str, default=".json")
 parser.add_argument('--outdir', type=str, default="data/text")
-parser.add_argument("--cpus", type=int, default=1)
+parser.add_argument("--cpus", type=int, default=10)
 parser.add_argument("--verbose", type=int, default=1)
 # ----------------------------------------
 
@@ -99,6 +107,28 @@ def save_data(counter, outdir, text_data):
             line = line + '\n'
             f.write(line)
 
+
+def multiprocess_extract_data(path, outdir):
+    """Function to implement a way to multiprocess the extraction process.
+
+    Args:
+        path (str): path to the file to be processed.
+        outdir (str): path to save the data
+    """
+    nlp = spacy.load("en_core_sci_lg")
+    filename = f"{str(uuid.uuid4)}.txt"
+    full_path = os.path.join(outdir, filename)
+    
+    text_data = extract_body_text(path, model=nlp)
+    with open(full_path, 'w') as f:
+        for txt in text_data:
+            if len(txt) == 0:
+                continue
+            txt = txt +'\n'
+            f.write(txt)
+
+    
+
 if __name__ == '__main__':
     
     # Get all of the cli arguments
@@ -109,6 +139,11 @@ if __name__ == '__main__':
     ext = args.ext
     cpus = args.cpus
     verbose = args.verbose
+
+    if cpus < 0:
+
+        raise TooFewCPUsException
+
     if verbose:
         print("Verbose mode enabled.")
         print("Arguments selected as follows:")
@@ -121,21 +156,26 @@ if __name__ == '__main__':
 
     json_paths, num_files = get_files_from_dir(path, ext)
     
-    if verbose:
-        print(f"Total number of files are: {num_files}")
-    
-    file_counter = 0
-    document_counter = 1
-    blocks = 1000
-    text_array = []
-    for doc in tqdm(json_paths):
+    if cpus == 1:
+        if verbose:
+            print(f"Total number of files are: {num_files}")
         
-        if document_counter > blocks:
-            save_data(counter=document_counter, text_data=text_array, outdir=outdir)
-            file_counter += 1
-            document_counter = 1
-            text_array = []
-        
-        doc_sents = extract_body_text(file_name=doc)
-        text_array += doc_sents
-        document_counter += 1
+        file_counter = 0
+        document_counter = 1
+        blocks = 1000
+        text_array = []
+        for doc in tqdm(json_paths):
+            
+            if document_counter > blocks:
+                save_data(counter=document_counter, text_data=text_array, outdir=outdir)
+                file_counter += 1
+                document_counter = 1
+                text_array = []
+            
+            doc_sents = extract_body_text(file_name=doc)
+            text_array += doc_sents
+            document_counter += 1
+
+    if cpus > 1:
+        with multiprocessing.Pool(cpus) as pool:
+            tqdm(pool.imap(multiprocess_extract_data, json_paths) total=num_files)
