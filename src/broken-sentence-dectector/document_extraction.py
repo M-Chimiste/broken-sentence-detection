@@ -117,11 +117,11 @@ def multiprocess_extract_data(path):
         outdir (str): path to save the data
     """
     global outdir
-    nlp = spacy.load("en_core_sci_lg")
-    filename = f"{str(uuid.uuid4)}.txt"
+    #nlp = spacy.load("en_core_sci_lg")
+    filename = f"{str(uuid.uuid4())}.txt"
     full_path = os.path.join(outdir, filename)
     
-    text_data = extract_body_text(path, model=nlp)
+    text_data = extract_body_text(path, model=SPACY_MODEL)
     with open(full_path, 'w') as f:
         for txt in text_data:
             if len(txt) == 0:
@@ -179,4 +179,4 @@ if __name__ == '__main__':
             document_counter += 1
 
     if cpus > 1:
-        process_map(multiprocess_extract_data, json_paths, max_workers=cpus, chunksize=100)
+        process_map(multiprocess_extract_data, json_paths, max_workers=cpus, chunksize=10)
