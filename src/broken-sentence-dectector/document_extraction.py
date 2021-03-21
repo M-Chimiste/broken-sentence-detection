@@ -178,4 +178,4 @@ if __name__ == '__main__':
 
     if cpus > 1:
         with multiprocessing.Pool(cpus) as pool:
-            tqdm(pool.imap(multiprocess_extract_data, json_paths) total=num_files)
+            tqdm(pool.imap(multiprocess_extract_data, json_paths), total=num_files)
