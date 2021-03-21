@@ -1,6 +1,7 @@
 import glob
 import json
 import argparse
+import os
 import multiprocessing
 import spacy
 import scispacy
@@ -29,9 +30,11 @@ class NotEnoughCPUsException(Exception):
 
 # Parser Object
 parser = argparse.ArgumentParser(description="Arguments for processing data")
-parser.add_argument("-path", type=str, default='data/document_parses/pmc_json')
-parser.add_argument("-ext", type=str, default=".json")
-parser.add_argument("-cpus", type=int, default=1)
+parser.add_argument("--path", type=str, default='data/document_parses/pmc_json')
+parser.add_argument("--ext", type=str, default=".json")
+parser.add_argument('--outdir', type=str, default="data/text")
+parser.add_argument("--cpus", type=int, default=1)
+parser.add_argument("--verbose", type=int, default=1)
 # ----------------------------------------
 
 
@@ -57,7 +60,7 @@ def get_files_from_dir(path, ext):
     return paths, num_files
 
 
-def extract_body_text(file_name):
+def extract_body_text(file_name, model=SPACY_MODEL):
     """Function to open the data json file and extract just the text data.
 
     Args:
@@ -66,16 +69,73 @@ def extract_body_text(file_name):
     Returns:
         [list]: List of the text data from the 
     """
+    
     text_data = []
     
     with open(file_name, 'r') as f:
         json_obj = json.load(f)
     body_text = json_obj['body_text']
     for text in body_text:
-        text_data.append(text['text'])
+        document = model(text['text'])
+        
+        for sent in document.sents:
+            text_data.append(sent.text)
+
     return text_data
 
 
-if __name__ == '__main__':
-    args = parser.parse_args()
+def save_data(counter, outdir, text_data):
+    """Function to save text data to disk at a given output directory.
 
+    Args:
+        counter (int): file number to be written.
+        outdir ([type]): directory for the files to be output to.
+        text_data ([type]): 
+    """
+    filename = str(counter) + '.txt'
+    file_path = os.path.join(outdir, filename)
+    with open(file_path, 'w') as f:
+        for line in text_data:
+            line = line + '\n'
+            f.write(line)
+
+if __name__ == '__main__':
+    
+    # Get all of the cli arguments
+    args = parser.parse_args()
+    
+    path = args.path
+    outdir = args.outdir
+    ext = args.ext
+    cpus = args.cpus
+    verbose = args.verbose
+    if verbose:
+        print("Verbose mode enabled.")
+        print("Arguments selected as follows:")
+        print(f"path: {path}\noutdir: {outdir}\next: {ext}\ncpus: {cpus}")
+    try:
+        os.makedirs(outdir, exist_ok=False)
+    except:
+        print(f'The directory structure {outdir} does already exists.  Skipping directory generation.')
+        os.makedirs(outdir, exist_ok=True)
+
+    json_paths, num_files = get_files_from_dir(path, ext)
+    
+    if verbose:
+        print(f"Total number of files are: {num_files}")
+    
+    file_counter = 0
+    document_counter = 1
+    blocks = 1000
+    text_array = []
+    for doc in tqdm(json_paths):
+        
+        if document_counter > blocks:
+            save_data(counter=document_counter, text_data=text_array, outdir=outdir)
+            file_counter += 1
+            document_counter = 1
+            text_array = []
+        
+        doc_sents = extract_body_text(file_name=doc)
+        text_array += doc_sents
+        document_counter += 1
