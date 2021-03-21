@@ -129,7 +129,6 @@ def multiprocess_extract_data(path):
             txt = txt +'\n'
             f.write(txt)
 
-    
 
 if __name__ == '__main__':
     
@@ -180,4 +179,4 @@ if __name__ == '__main__':
             document_counter += 1
 
     if cpus > 1:
-        process_map(multiprocess_extract_data, json_paths, max_workers=cpus)
+        process_map(multiprocess_extract_data, json_paths, max_workers=cpus, chunksize=100)
