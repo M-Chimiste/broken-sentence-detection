@@ -7,6 +7,7 @@ import multiprocessing
 import spacy
 import scispacy
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map
 
 CPU_COUNT = multiprocessing.cpu_count()
 SPACY_MODEL = spacy.load("en_core_sci_lg")
@@ -108,13 +109,14 @@ def save_data(counter, outdir, text_data):
             f.write(line)
 
 
-def multiprocess_extract_data(path, outdir):
+def multiprocess_extract_data(path):
     """Function to implement a way to multiprocess the extraction process.
 
     Args:
         path (str): path to the file to be processed.
         outdir (str): path to save the data
     """
+    global outdir
     nlp = spacy.load("en_core_sci_lg")
     filename = f"{str(uuid.uuid4)}.txt"
     full_path = os.path.join(outdir, filename)
@@ -136,6 +138,7 @@ if __name__ == '__main__':
     
     path = args.path
     outdir = args.outdir
+    
     ext = args.ext
     cpus = args.cpus
     verbose = args.verbose
@@ -177,5 +180,4 @@ if __name__ == '__main__':
             document_counter += 1
 
     if cpus > 1:
-        with multiprocessing.Pool(cpus) as pool:
-            tqdm(pool.imap(multiprocess_extract_data, json_paths), total=num_files)
+        process_map(multiprocess_extract_data, json_paths, max_workers=cpus)
